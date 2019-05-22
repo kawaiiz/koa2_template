@@ -1,0 +1,17 @@
+/**
+ * 启动文件
+ * */
+let app = require('../app')
+const config = require('../config/key');
+
+//注册路由  路由拦截
+require('../config/router')(app)
+
+//启动服务
+app.listen(process.env.PORT || config.prot, () => {
+  console.log(config.prot)
+})
+
+app.on('error', (err) => {
+  console.log(err)
+})
