@@ -7,6 +7,7 @@ const schema = require('async-validator');
 const uuidv1 = require('uuid/v1');// 生成id使用
 const bcrypt = require('bcryptjs')
 var jwt = require('jsonwebtoken');
+const redis = require('../../libs/redis');// 测试redis
 
 // 经过封装的方法
 const query = require('../../libs/connection');//mysql 请求函数
@@ -20,55 +21,71 @@ let {adminCmsSql, userCmsSql} = cms
 /**
  * @desc 用户登录
  * @access 接口公开
- * @parameter type=>1(手机密码登录)/2（手机短信登录） mobile password msg
+ * @parameter type=>password(手机密码登录)/msg（手机短信登录） mobile password msg
  * */
 
 let loginRuler = {
-  username: [{type: 'string', message: '姓名不能为空', min: 1}],
+  msg: [{type: 'string', message: '短信不能为空', min: 1}],
   password: [{type: 'string', message: '密码不能为空', min: 1}],
-  mobile: [{type: 'string', pattern: /^1\d{10}/, message: '请查看手机号格式是否正确'}]
+  mobile: [{type: 'string', required: true, pattern: /^1\d{10}/, message: '请查看手机号格式是否正确'}]
 }
 let loginValidator = new schema(loginRuler);
 router.post('/login', async (ctx) => {
+  // 为了log日志
   let userInfo = {
-    username:'',
-    user_id:''
+    username: '',
+    user_id: ''
   }
   let result = {}
+
+  async function _OK() {
+    delete userInfo.password
+    // token 中储存的数据
+    let payload = {
+      id: userInfo.id,
+      type: 'cms',
+      username: userInfo.username,
+      mobile: userInfo.mobile
+    }
+    const token = await jwt.sign(payload, config.TOKEN_SECRET, {expiresIn: 60 * 60})
+    result = {
+      data: {
+        userInfo,
+        token:`Bearer ${token}`
+      },
+      status: 1,
+      msg: '登录成功'
+    }
+    userInfo.type = 'cms'
+    util.publicBody(ctx, result, userInfo)
+  }
+
   try {
-    let {username, password, mobile, type} = ctx.request.body;
+    let {mobile, password, msg, type} = ctx.request.body;
     let user = await query(adminCmsSql.check, [mobile])
-    userInfo = user[0]
     if (user.length === 0) throw '该手机号未在后台添加'
+    userInfo = user[0]
     // 验证输入是否正确
     await loginValidator.validate(ctx.request.body)
-    if (type === 1) {
+    if (type === 'password') {
       // 检查登录的密码和库里的是否相同
-      let result = await bcrypt.compareSync(password, user[0].password)
-      // 相同
-      if (result) {
-        // token 中储存的数据
-        let payload = {
-          id: user[0].id,
-          type: 'cms',
-          username: user[0].username
-        }
-        const token = await jwt.sign(payload, config.TOKEN_SECRET, {expiresIn: 60*60})
-        result = {
-          data: {
-            userInfo: user[0],
-            token: token
-          },
-          status: 1,
-          msg: '登录成功'
-        }
-        userInfo.type = 'cms'
-        util.publicBody(ctx, result, user[0])
+      if (await bcrypt.compareSync(password, user[0].password)) {
+        _OK()
       } else {
         throw '密码错误'
       }
+    } else if (type === 'msg') {
+      let redisMsg = await redis.get(`${mobile}cmsLogin`)
+      if (redisMsg === msg) {
+        redis.del(`${mobile}cmsLogin`);
+
+        _OK()
+      } else {
+        throw '验证码错误'
+      }
     }
   } catch (e) {
+    console.log(e)
     userInfo.type = 'cms'
     result = {
       status: 0,
@@ -148,5 +165,43 @@ router.post('/updata', async (ctx) => {
   }
 });
 
+/**
+ * @desc 忘记密码
+ * @access 接口公开
+ * @parameter  password , mobile ，msg
+ * */
+let resetPasswordRuler = {
+  msg: [{type: 'string', required: true, message: '短信不能为空', min: 1}],
+  password: [{type: 'string', required: true, message: '密码不能为空', min: 1}],
+  mobile: [{type: 'string', required: true, pattern: /^1\d{10}/, message: '请查看手机号格式是否正确'}]
+}
+let resetPasswordValidator = new schema(updataRuler);
+router.post('/resetPassword', async (ctx) => {
+  let result = {}
+  try {
+    // 字段验证
+    await resetPasswordValidator.validate(ctx.request.body)
+    let {mobile, msg, password} = ctx.request.body
+    // 短信验证
+    let redisMsg = await redis.get(`${mobile}cmsSetPassword`)
+    if (redisMsg !== msg) throw '短信不正确';
+    redis.del(`${mobile}cmsSetPassword`);
+
+    password = await util.enbcrypt(password)
+    await query(adminCmsSql.resetPassword, [password, ctx.state.id])
+    result = {
+      status: 1,
+      msg: '修改成功'
+    }
+    util.publicBody(ctx, result, ctx.state)
+  } catch (e) {
+    console.log(e)
+    result = {
+      status: 0,
+      msg: util.publicError(e)
+    }
+    util.publicBody(ctx, result, ctx.state)
+  }
+});
 
 module.exports = router.routes();

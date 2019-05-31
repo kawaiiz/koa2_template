@@ -6,8 +6,10 @@
  * 前端程序
  * */
 const applets = {
-  userSql: {
-    insert: "INSERT INTO users (id,username,password,mobile) VALUES (?,?,?,?,?)",
+  userAppSql: {
+    check: "SELECT id,username,password,mobile FROM users WHERE mobile = ?",//查找当前手机号是否存在于数据库
+    insert: "INSERT INTO users (id,username,password,mobile) VALUES (?,?,?,?)",
+    userInfo: "SELECT id,username,password,mobile FROM users WHERE id = ?",//查找当前用户是否存在于数据库
     // 动态控制 通过body传来的数据动态更新用户的信息
     update: (body, id) => {
       let param = ''
@@ -17,8 +19,8 @@ const applets = {
       param = param.substr(0, param.length - 1)
       return `UPDATE users SET ${param} WHERE id = '${id}'`
     },
-    check: "SELECT id,username,password,mobile FROM users WHERE mobile = ?",//查找当前用户是否存在于数据库
-    userInfo: "SELECT id,username,password,mobile FROM users WHERE id = ?"//查找当前用户是否存在于数据库
+    resetPassword: `UPDATE users SET password = ? WHERE id = ?`,
+    resetMobile: `UPDATE users SET mobile = ? WHERE id = ?`
   }
 };
 
@@ -29,8 +31,8 @@ const cms = {
   //后台用户登录
   adminCmsSql: {
     check: "SELECT id,username,password,mobile FROM admin WHERE mobile = ?",//查找当前手机号是否存在于数据库
-    insert: "INSERT INTO admin (id,username,password,mobile) VALUES (?,?,?,?,?)",
-    userInfo: "SELECT id,username,password,mobile FROM users WHERE id = ?",//查找当前用户是否存在于数据库
+    insert: "INSERT INTO admin (id,username,password,mobile) VALUES (?,?,?,?)",
+    userInfo: "SELECT id,username,password,mobile FROM admin WHERE id = ?",//查找当前用户是否存在于数据库
     // 动态控制 通过body传来的数据动态更新用户的信息
     update: (body, id) => {
       let param = ''
@@ -40,6 +42,7 @@ const cms = {
       param = param.substr(0, param.length - 1)
       return `UPDATE admin SET ${param} WHERE id = '${id}'`
     },
+    resetPassword: `UPDATE admin SET password = ? WHERE id = ?`
   },
   /* 小程序用户*/
   userCmsSql: {
@@ -60,7 +63,16 @@ const cms = {
   }
 };
 
+/**
+ * 公用接口
+ * */
+const common = {}
+
+/**
+ * 公共接口
+ * */
 module.exports = {
   applets,
-  cms
+  cms,
+  common
 };

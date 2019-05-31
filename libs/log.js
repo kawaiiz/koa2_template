@@ -22,7 +22,6 @@ module.exports = async (ctx, flag, userInfo) => {
       case '/api/cms/admin/updata':
         name = '用户更新数据'
     }
-    console.log([uuidv1(), name, userInfo.username, userInfo.id, JSON.stringify(ctx.request.body), ctx.originalUrl, flag])
     await query(logCmsSql.insert, [uuidv1(), name, userInfo.username, userInfo.id, JSON.stringify(ctx.request.body), ctx.originalUrl, flag.toString()])
   }catch (e) {
     console.log(e)

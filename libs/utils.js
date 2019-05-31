@@ -1,5 +1,6 @@
-let bcrypt = require('bcryptjs');
+const bcrypt = require('bcryptjs');
 const log = require('./log')
+
 const util = {
   /*密码加密*/
   enbcrypt(password) {
@@ -18,7 +19,7 @@ const util = {
   publicBody(ctx, result, userInfo) {
     ctx.body = result
     if (userInfo.type === "cms") {
-      log(ctx,result.status,userInfo)
+      log(ctx, result.status, userInfo)
     }
   }
 }

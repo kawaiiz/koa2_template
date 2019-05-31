@@ -1,10 +1,19 @@
+/**
+ * 设置路由
+ * */
+
 var jwt = require('jsonwebtoken');
 const Router = require('koa-router');
 const router = new Router();
 const config = require('./key');
-const appletsPage = ['/api/applets/users/login']
+
+/**
+* 设置不需要token
+* */
+const appletsPage = ['/api/applets/users/login', '/api/applets/users/register']
 const cmsPage = ['/api/cms/admin/login', '/api/cms/admin/register']
-const allowpage = appletsPage.concat(cmsPage)
+const commonPage = ['/api/common/msg/getMsg']
+const allowpage = appletsPage.concat(cmsPage).concat(commonPage)
 
 /**
  * token验证 并写入后台操作日志
@@ -14,7 +23,8 @@ const checkLogin = async (ctx, next) => {
     await next()
   } else {
     try {
-      ctx.state = await jwt.verify(ctx.request.header.authorization, config.TOKEN_SECRET, {})
+      let token = ctx.request.header.authorization.split(' ')[1]
+      ctx.state = await jwt.verify(token, config.TOKEN_SECRET, {})
       await next()
     } catch (e) {
       let result = {}
@@ -48,6 +58,8 @@ module.exports = (app) => {
   const usersCms = require('../routes/cms/users');
   const adminCms = require('../routes/cms/admin');
 
+  //后端数据
+  const msgCommon = require('../routes/common/msg')
   /**
    * 注册路由
    * */
@@ -58,7 +70,10 @@ module.exports = (app) => {
   router.use('/api/cms/admin', adminCms);
   router.use('/api/cms/users', usersCms);
 
-// 配置路由
+  //公共路由
+  router.use('/api/common/msg', msgCommon)
+
+  // 配置路由
   app.use(router.routes()).use(router.allowedMethods());
 
 };
